@@ -1,0 +1,41 @@
+name: Update HCB Data
+
+on:
+  schedule:
+    # Check frequently without overloading sources (every 2 hours)
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+jobs:
+  build-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 lxml pdfplumber python-dateutil rapidfuzz
+
+      - name: Run pipeline
+        run: |
+          python scripts/update_data.py
+
+      - name: Commit if data changed
+        run: |
+          if [[ -n "$(git status --porcelain data/index.json)" ]]; then
+            git config user.name "halalintel-bot"
+            git config user.email "bot@users.noreply.github.com"
+            git add data/index.json
+            git commit -m "data: refresh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          else
+            echo "No changes to commit."
+          fi
